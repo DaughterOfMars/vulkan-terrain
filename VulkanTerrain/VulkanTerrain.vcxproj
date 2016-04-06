@@ -148,8 +148,10 @@
   <ItemGroup>
     <ClCompile Include="base\vulkandebug.cpp" />
     <ClCompile Include="base\vulkantools.cpp" />
+    <ClCompile Include="Chunk.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="VulkanBase.cpp" />
+    <ClCompile Include="VulkanTerrain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="TODO.txt" />

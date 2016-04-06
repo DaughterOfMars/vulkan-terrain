@@ -46,41 +46,41 @@ private:
 	} uboMVP;
 
 	struct {
-		vkTools::VulkanTexture triTable;
 		vkTools::VulkanTexture dirt;
 		vkTools::VulkanTexture grass;
 	} uboTextures;
 
 	struct {
-		glm::ivec3 worldPos;
-	} uboCompute;
-
-	struct {
 		vkTools::UniformData mvp;
 		vkTools::UniformData textures;
-		vkTools::UniformData compute;
 	} uniformData;
 
 	struct {
-		VkPipeline compute;
 		VkPipeline render;
 	} pipelines;
 
+	struct {
+		glm::vec4 pos;
+		glm::vec4 dir;
+		glm::vec4 up;
+	} cam;
+
+	VkPipelineLayout pipelineLayout;
+	VkDescriptorSet descriptorSet;
+	VkDescriptorSetLayout descriptorSetLayout;
+
+	float moveSpeed;
+	float sprintSpeed;
+
 	void loadTextures();
 	void buildCommandBuffers();
-	void buildComputeCommandBuffers();
 	void draw();
-	void prepareStorageBuffers();
-	//void setupVertexDescriptions();
 	void setupDescriptorPool();
 	void setupDescriptorSetLayout();
 	void setupDescriptorSet();
-	void createComputeCommandBuffer();
 	void preparePipelines();
-	void prepareCompute();
 	void prepareUniformBuffers();
 	void updateUniformBuffers();
-	void getComputeQueue();
 	void prepare();
 	virtual void render();
 	void handleMessages();
