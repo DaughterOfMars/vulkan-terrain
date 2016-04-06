@@ -35,7 +35,7 @@ protected:
 	VkInstance instance;
 	VkPhysicalDevice physicalDevice;
 	VkPhysicalDeviceProperties deviceProperties;
-	VkPhysicalDeviceMemoryProperties devicememProperties;
+	VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
 	VkDevice device;
 	VkQueue queue;
 	VkFormat colorFormat = VK_FORMAT_B8G8R8A8_UNORM;
@@ -58,6 +58,7 @@ protected:
 		VkSemaphore presentComplete;
 		VkSemaphore renderComplete;
 	} semaphores;
+	vkTools::VulkanTextureLoader *textureLoader = nullptr;
 public:
 	bool prepared = false;
 	uint32_t width = 1280;
@@ -139,4 +140,6 @@ public:
 	VkSubmitInfo prepareSubmitInfo(
 		std::vector<VkCommandBuffer> commandBuffers,
 		VkPipelineStageFlags *pipelineStages);
+
+	VkBool32 getMemoryType(uint32_t typeBits, VkFlags properties, uint32_t * typeIndex);
 };
