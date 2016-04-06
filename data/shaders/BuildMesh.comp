@@ -1,0 +1,319 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 32, local_z_size = 32) in;
+layout(binding = 0, r32f) uniform isampler2D triTable;
+
+layout(std140, binding = 0) uniform UBO{
+	ivec3 WorldPosition
+};
+
+layout (std430, binding = 0) buffer vertex_buffer{
+	vec3 worldPosition[];
+	vec3 normal[];
+}
+
+layout (std430, binding = 1) buffer index_buffer{
+	uint index[];
+}
+
+uint vertex_buffer_index = 0;
+uint index_buffer_index = 0;
+
+int DensityTextureMargin = 1;
+int DensityTextureSize = 32;
+
+shared float DensityMap[33][33][33];
+
+const ivec3 shift[8] = {
+	ivec3(0, 0, 0),
+	ivec3(0, 1, 0),
+	ivec3(1, 1, 0),
+	ivec3(1, 0, 0),
+	ivec3(0, 0, 1),
+	ivec3(0, 1, 1),
+	ivec3(1, 1, 1),
+	ivec3(1, 0, 1)
+};
+
+// Specifies which direction to shift to get the neighboring index
+const ivec3 shift2[12] = {
+	ivec3(0, 0, 0), // If edge 0, do not change voxel
+	ivec3(0, 1, 0), // If edge 1, move up in y-axis
+	ivec3(1, 0, 0), // If edge 2, move right in x axis
+	ivec3(0, 0, 0), // If edge 3, do not change voxel
+	ivec3(0, 0, 1), // If edge 4, move forward in z-axis
+	ivec3(0, 1, 1), // 5
+	ivec3(1, 0, 1), // 6
+	ivec3(0, 0, 1), // 7
+	ivec3(0, 0, 0), // 8
+	ivec3(0, 1, 0), // 9
+	ivec3(1, 1, 0), // 10
+	ivec3(1, 0, 0), // 11
+};
+
+const ivec2 edge_to_verts[12] = {
+	ivec2(0, 1), //0
+	ivec2(1, 2), //1
+	ivec2(2, 3), //2
+	ivec2(3, 0), //3
+	ivec2(4, 5), //4
+	ivec2(5, 6), //5
+	ivec2(6, 7), //6
+	ivec2(7, 4), //7
+	ivec2(0, 4), //8
+	ivec2(1, 5), //9
+	ivec2(2, 6), //10
+	ivec2(3, 7)  //11
+};
+const ivec3 vert_to_texcoord[8] = {
+	ivec3(0, 0, 0), // v0
+	ivec3(0, 1, 0), // v1
+	ivec3(1, 1, 0), // v2
+	ivec3(1, 0, 0), // v3
+	ivec3(0, 0, 1), // v4
+	ivec3(0, 1, 1), // v5
+	ivec3(1, 1, 1), // v6
+	ivec3(1, 0, 1)  // v7
+};
+
+const int EdgeOffsets[12] =
+{
+	1, 0, 1, 0, 1, 0, 1, 0, 2, 2, 2, 2
+};
+
+const int edgeTable[256] = 
+{
+	0, 1, 1, 2, 1, 2, 2, 3,  1, 2, 2, 3, 2, 3, 3, 2,  1, 2, 2, 3, 2, 3, 3, 4,  2, 3, 3, 4, 3, 4, 4, 3,  
+    1, 2, 2, 3, 2, 3, 3, 4,  2, 3, 3, 4, 3, 4, 4, 3,  2, 3, 3, 2, 3, 4, 4, 3,  3, 4, 4, 3, 4, 5, 5, 2,  
+    1, 2, 2, 3, 2, 3, 3, 4,  2, 3, 3, 4, 3, 4, 4, 3,  2, 3, 3, 4, 3, 4, 4, 5,  3, 4, 4, 5, 4, 5, 5, 4,  
+    2, 3, 3, 4, 3, 4, 2, 3,  3, 4, 4, 5, 4, 5, 3, 2,  3, 4, 4, 3, 4, 5, 3, 2,  4, 5, 5, 4, 5, 2, 4, 1,  
+    1, 2, 2, 3, 2, 3, 3, 4,  2, 3, 3, 4, 3, 4, 4, 3,  2, 3, 3, 4, 3, 4, 4, 5,  3, 2, 4, 3, 4, 3, 5, 2,  
+    2, 3, 3, 4, 3, 4, 4, 5,  3, 4, 4, 5, 4, 5, 5, 4,  3, 4, 4, 3, 4, 5, 5, 4,  4, 3, 5, 2, 5, 4, 2, 1,  
+    2, 3, 3, 4, 3, 4, 4, 5,  3, 4, 4, 5, 2, 3, 3, 2,  3, 4, 4, 5, 4, 5, 5, 2,  4, 3, 5, 4, 3, 2, 4, 1,  
+    3, 4, 4, 5, 4, 5, 3, 4,  4, 5, 5, 2, 3, 4, 2, 1,  2, 3, 3, 2, 3, 4, 2, 1,  3, 2, 4, 1, 2, 1, 1, 0 
+};
+
+shared uint vertexIDs[32*3][32][32];
+
+vec3 mod289(vec3 x) {
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 mod289(vec4 x) {
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 permute(vec4 x) {
+	return mod289(((x*34.0) + 1.0)*x);
+}
+
+vec4 taylorInvSqrt(vec4 r)
+{
+	return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+float snoise(vec3 v)
+{
+	const vec2  C = vec2(1.0 / 6.0, 1.0 / 3.0);
+	const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+
+	// First corner
+	vec3 i = floor(v + dot(v, C.yyy));
+	vec3 x0 = v - i + dot(i, C.xxx);
+
+	// Other corners
+	vec3 g = step(x0.yzx, x0.xyz);
+	vec3 l = 1.0 - g;
+	vec3 i1 = min(g.xyz, l.zxy);
+	vec3 i2 = max(g.xyz, l.zxy);
+
+	//   x0 = x0 - 0.0 + 0.0 * C.xxx;
+	//   x1 = x0 - i1  + 1.0 * C.xxx;
+	//   x2 = x0 - i2  + 2.0 * C.xxx;
+	//   x3 = x0 - 1.0 + 3.0 * C.xxx;
+	vec3 x1 = x0 - i1 + C.xxx;
+	vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y
+	vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
+
+	// Permutations
+	i = mod289(i);
+	vec4 p = permute(permute(permute(
+		i.z + vec4(0.0, i1.z, i2.z, 1.0))
+		+ i.y + vec4(0.0, i1.y, i2.y, 1.0))
+		+ i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+	// Gradients: 7x7 points over a square, mapped onto an octahedron.
+	// The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
+	float n_ = 0.142857142857; // 1.0/7.0
+	vec3  ns = n_ * D.wyz - D.xzx;
+
+	vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)
+
+	vec4 x_ = floor(j * ns.z);
+	vec4 y_ = floor(j - 7.0 * x_);    // mod(j,N)
+
+	vec4 x = x_ *ns.x + ns.yyyy;
+	vec4 y = y_ *ns.x + ns.yyyy;
+	vec4 h = 1.0 - abs(x) - abs(y);
+
+	vec4 b0 = vec4(x.xy, y.xy);
+	vec4 b1 = vec4(x.zw, y.zw);
+
+	//vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;
+	//vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;
+	vec4 s0 = floor(b0)*2.0 + 1.0;
+	vec4 s1 = floor(b1)*2.0 + 1.0;
+	vec4 sh = -step(h, vec4(0.0));
+
+	vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+	vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+
+	vec3 p0 = vec3(a0.xy, h.x);
+	vec3 p1 = vec3(a0.zw, h.y);
+	vec3 p2 = vec3(a1.xy, h.z);
+	vec3 p3 = vec3(a1.zw, h.w);
+
+	//Normalise gradients
+	vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+	p0 *= norm.x;
+	p1 *= norm.y;
+	p2 *= norm.z;
+	p3 *= norm.w;
+
+	// Mix final noise value
+	vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+	m = m * m;
+	return 42.0 * dot(m*m, vec4(dot(p0, x0), dot(p1, x1),
+		dot(p2, x2), dot(p3, x3)));
+}
+
+float density(ivec3 ChunkPosition)
+{
+	vec3 WorldPoint = vec3(WorldPosition + ChunkPosition + vec3(0, 16, 0));
+	float density = -WorldPoint.y;
+
+	float angle = .9;
+	const mat3 RotationMatrix = mat3(
+		cos(angle), -sin(angle), 0,
+		sin(angle), cos(angle), 0,
+		0, 0, 0
+	);
+
+	// clamp((<<Y-Coord to flatten at>> - WorldPoint.y), 0.0, 1.0)*<<Width of the Flat Zone>>;
+	density += clamp((35.0 - WorldPoint.y), 0.0, 1.0)*10.0;
+	density += clamp((30.0 - WorldPoint.y), 0.0, 1.0)*20.0;
+	density += clamp((20.0 - WorldPoint.y), 0.0, 1.0)*10.0;
+	density += clamp((10.0 - WorldPoint.y), 0.0, 1.0)*5.0;
+	density += clamp((3.0 - WorldPoint.y), 0.0, 1.0)*10.0;
+	
+	WorldPoint += 60.0 * snoise(WorldPoint * .0035);
+	WorldPoint += 120.0 * snoise(WorldPoint * .0015);
+	WorldPoint += 240.0 * snoise(WorldPoint * .0007);
+
+	density += .25 * snoise(RotationMatrix*WorldPoint * .401);
+	density += .5 * snoise(RotationMatrix*WorldPoint * .193);
+	density += 1.0 * snoise(WorldPoint*.101);
+	density += 2.0 * snoise(WorldPoint*.049);
+	density += 4.0 * snoise(WorldPoint*.022);
+	density += 8.0 * snoise(WorldPoint*.01);
+	density += 16.0 * snoise(WorldPoint*.0051);
+	density += 24.0 * snoise(WorldPoint*.0023);
+	density += 48.0 * snoise(WorldPoint*.0009);
+
+	return density;
+}
+
+uint generateVert(ivec3 pos, uint edge){
+	ivec2 verts = edge_to_verts[edge];
+	ivec3 EdgeVert1 = vert_to_texcoord[verts.x] + pos;
+	ivec3 EdgeVert2 = vert_to_texcoord[verts.y] + pos;
+	float VertDensity1 = DensityMap[EdgeVert1.x + DensityTextureMargin][EdgeVert1.y + DensityTextureMargin][EdgeVert1.z + DensityTextureMargin];
+	float VertDensity2 = DensityMap[EdgeVert2.x + DensityTextureMargin][EdgeVert2.y + DensityTextureMargin][EdgeVert2.z + DensityTextureMargin];
+	
+	float PercentToMove = clamp(VertDensity1 / (VertDensity1 - VertDensity2), 0.0, 1.0);
+	vec3 vertex = EdgeVert1 * (1.0 - PercentToMove) + EdgeVert2 * PercentToMove;
+	
+	float d = 1.0 / (DensityTextureSize + 2 * DensityTextureMargin);
+	vec3 UVW = (vertex + DensityTextureMargin) * d;
+	
+	vec3 gradient;
+	gradient.x = DensityMap[UVW.x + d][UVW.y][UVW.z] - DensityMap[UVW.x-d][UVW.y][UVW.z];
+	gradient.y = DensityMap[UVW.x][UVW.y + d][UVW.z] - DensityMap[UVW.x][UVW.y-d][UVW.z];
+	gradient.z = DensityMap[UVW.x][UVW.y][UVW.z + d] - DensityMap[UVW.x][UVW.y][UVW.z-d];
+	
+	worldPosition[vertex_buffer_index] = vec3(WorldPosition+vertex);
+	normals[vertex_buffer_index] = -normalize(gradient);
+	return vertex_buffer_index++;
+}
+
+void generateIndices(ivec3 pos, uint caseID){
+	uint triangleCount = edgeTable[caseID];
+	if (max(max(pos.x, pos.y), pos.z) >= DensityTextureSize)
+		triangleCount = 0;
+	for(uint t = 0; t < triangleCount; t++){
+		uint tableOffset = t*3;
+		ivec3 vertexEdges = ivec3(texelFetch(triTable, ivec2(tableOffset, caseID), 0).r, texelFetch(triTable, ivec2(tableOffset+1, caseID), 0).r, texelFetch(triTable, ivec2(tableOffset+2, caseID), 0).r);
+		uvec3 indices;
+		for(int i = 2; i >= 0; --i){
+			ivec3 voxel = pos + shift2[vertexEdges[i]];
+			voxel.x *= 3;
+			voxel.x += EdgeOffsets[vertexEdges[i]];
+			indices[i] = vertexIDs[voxel.x][voxel.y][voxel.z];
+		}
+		index[index_buffer_index++] = indices[0];
+		index[index_buffer_index++] = indices[1];
+		index[index_buffer_index++] = indices[2];
+	}
+}
+
+void writeVertexIDs(ivec3 pos, uint edge, uint vertexID){
+	ivec3 pos_offset = pos;
+	pos_offset.x = pos_offset.x * 3 + EdgeOffsets[edge];
+	vertexIDs[pos_offset.x][pos_offset.y][pos_offset.z] = vertexID;
+}
+
+void listVertsToGen(ivec3 pos, uint caseID){
+	uint v0 = 1;
+	uint v1 = 1 << 1;
+	uint v3 = 1 << 3;
+	uint v4 = 1 << 4;
+
+	uint v0Status = caseID & v0;
+	int ID;
+	
+	// Check edge 0
+	if (v0Status != ((caseID & v1) >> 1))
+	{
+		ID = generateVert(pos, 0, caseID);
+		writeVertexIDs(pos, 0, ID);
+	}
+
+	// Check edge 3
+	if (v0Status != ((caseID & v3) >> 3))
+	{
+		generateVert(pos, 3, caseID);
+	}
+
+	// Check edge 8
+	if (v0Status != ((caseID & v4) >> 4))
+	{
+		generateVert(pos, 8, caseID);
+	}
+}
+
+void main(){
+	ivec3 pos = ivec3(gl_GlobalInvocationID);
+	d = density(pos)
+	DensityMap[pos.x][pos.y][pos.z] = d;
+	barrier(); // Ensure that density values are complete
+	uint caseID = 0;
+	for(int i = 7; i >= 0; --i)
+		caseID = caseID | (d > 0 ? 1 : 0) << i;
+	if(caseID != 0 && caseID != 255)
+		listVertsToGen(pos, caseID);
+		barrier(); // Ensure that vertex IDs are filled in
+		generateIndices(pos, caseID);
+	else
+		barrier(); // for uniformity purposes
+	
+}
