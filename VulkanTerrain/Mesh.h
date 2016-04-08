@@ -1,7 +1,7 @@
 #pragma once
 
 #include "VulkanBase.h"
-#include "Chunk.h"
+#include "Camera.hpp"
 
 struct Vertex {
 	float pos[3];
@@ -26,15 +26,17 @@ private:
 		uint32_t indexCount;
 	};
 
+public:
+	struct {
+		MeshBuffer terrain;
+	} meshes;
+
+private:
 	struct {
 		VkPipelineVertexInputStateCreateInfo inputState;
 		std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 	} vertices;
-
-	struct {
-		MeshBuffer terrain;
-	} meshes;
 
 	struct {
 		glm::mat4 model;
@@ -55,18 +57,16 @@ private:
 		VkPipeline render;
 	} pipelines;
 
-	struct {
-		glm::vec4 pos;
-		glm::vec4 dir;
-		glm::vec4 up;
-	} cam;
-
 	VkPipelineLayout pipelineLayout;
 	VkDescriptorSet descriptorSetPostCompute;
 	VkDescriptorSetLayout descriptorSetLayout;
 
+	Camera *cam;
+
 	float moveSpeed;
 	float sprintSpeed;
+
+	bool keyboardState[256] = { false };
 
 	void loadMesh();
 	void loadTextures();

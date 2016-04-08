@@ -1,14 +1,9 @@
 Mesh
 	cleanup
 	load mesh
-	load textures
-	draw
-	prepare uniform buffers
-	update uniform buffers
 	handle messages
 VulkanTerrain
 	initializer
 	cleanup
 	preparestoragebuffers
-
-
+		- deal with index storage buffer

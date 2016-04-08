@@ -1,13 +1,9 @@
 #include "Mesh.h"
 
 Mesh::Mesh(bool enableValidation) : VulkanBase(enableValidation) {
-	width = 800;
-	height = 600;
-	title = "3D Graph Visualizer";
+	title = "Vulkan Terrain";
 
-	cam.pos = glm::vec4(-25.0f, -25.0f, 25.0f, 1.0f);
-	cam.dir = glm::vec4(25.0f, 25.0f, 25.0f, 1.0f) - cam.pos;
-	cam.up = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+	cam = new Camera((float)width, (float)height);
 
 	moveSpeed = 50.0f;
 	sprintSpeed = 100.0f;
@@ -18,12 +14,17 @@ Mesh::~Mesh() {
 
 }
 
-void Mesh::loadMesh() {
-
-}
-
 void Mesh::loadTextures() {
-
+	textureLoader->loadTexture(
+		"./../data/textures/dirt.png",
+		VK_FORMAT_R8G8B8A8_UNORM,
+		&textures.dirt,
+		false);
+	textureLoader->loadTexture(
+		"./../data/textures/grass.png",
+		VK_FORMAT_R8G8B8A8_UNORM,
+		&textures.grass,
+		false);
 }
 
 void Mesh::buildCommandBuffers() {
@@ -79,7 +80,20 @@ void Mesh::buildCommandBuffers() {
 }
 
 void Mesh::draw() {
-	
+	vkTools::checkResult(swapChain.acquireNextImage(semaphores.presentComplete, &currentBuffer));
+
+	submitPostPresentBarrier(swapChain.buffers[currentBuffer].image);
+
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &drawCmdBuffers[currentBuffer];
+
+	vkTools::checkResult(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
+
+	submitPrePresentBarrier(swapChain.buffers[currentBuffer].image);
+
+	vkTools::checkResult(swapChain.queuePresent(queue, currentBuffer, semaphores.renderComplete));
+
+	vkTools::checkResult(vkQueueWaitIdle(queue));
 }
 
 void Mesh::setupDescriptorPool() {
@@ -243,16 +257,30 @@ void Mesh::preparePipelines() {
 }
 
 void Mesh::prepareUniformBuffers() {
-	
+	createBuffer(
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		sizeof(uboMVP),
+		&uboMVP,
+		&uniformData.mvp.buffer,
+		&uniformData.mvp.memory,
+		&uniformData.mvp.descriptor);
+
+	updateUniformBuffers();
 }
 
 void Mesh::updateUniformBuffers() {
-	
+	uboMVP.projection = cam->projection;
+	uboMVP.view = cam->view;
+	uboMVP.model = glm::mat4();
+
+	uint8_t *pData;
+	vkTools::checkResult(vkMapMemory(device, uniformData.mvp.memory, 0, sizeof(uboMVP), 0, (void **)&pData));
+	memcpy(pData, &uboMVP, sizeof(uboMVP));
+	vkUnmapMemory(device, uniformData.mvp.memory);
 }
 
 void Mesh::prepare() {
 	VulkanBase::prepare();
-	loadMesh();
 	loadTextures();
 	setupVertexDescriptions();
 	prepareUniformBuffers();

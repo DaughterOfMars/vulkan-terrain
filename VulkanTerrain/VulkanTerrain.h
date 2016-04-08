@@ -1,7 +1,8 @@
 #pragma once
 
 #include "VulkanBase.h"
-#include "Chunk.h"
+#include "Chunk.hpp"
+#include "Mesh.h"
 
 class VulkanTerrain : VulkanBase {
 public:
@@ -34,8 +35,9 @@ public:
 	VkDescriptorSetLayout computeDescriptorSetLayout;
 
 	Chunk *currentChunk;
+	Mesh *meshRenderer;
 
-	VulkanTerrain();
+	VulkanTerrain(bool enableValidation);
 	~VulkanTerrain();
 
 	void loadTextures();

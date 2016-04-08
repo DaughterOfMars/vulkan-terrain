@@ -1,7 +1,7 @@
 #include "VulkanTerrain.h"
 
-VulkanTerrain::VulkanTerrain() {
-
+VulkanTerrain::VulkanTerrain(bool enableValidation) {
+	meshRenderer = new Mesh(enableValidation);
 }
 
 VulkanTerrain::~VulkanTerrain() {
@@ -34,7 +34,54 @@ void VulkanTerrain::draw() {
 }
 
 void VulkanTerrain::prepareStorageBuffers() {
+	float destPosX = 0.0f;
+	float destPosY = 0.0f;
 
+	std::vector<Vertex> vertexBuffer;
+	uint32_t storageBufferSize = 32*32*32 * sizeof(Vertex);
+	VkMemoryAllocateInfo memAlloc = vkTools::initializers::memoryAllocateInfo();
+	VkMemoryRequirements memReqs;
+
+	void *data;
+
+	struct StagingBuffer {
+		VkDeviceMemory memory;
+		VkBuffer buffer;
+	} stagingBuffer;
+
+	VkBufferCreateInfo vBufferInfo =
+		vkTools::initializers::bufferCreateInfo(
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			storageBufferSize);
+	vkTools::checkResult(vkCreateBuffer(device, &vBufferInfo, nullptr, &stagingBuffer.buffer));
+	vkGetBufferMemoryRequirements(device, stagingBuffer.buffer, &memReqs);
+	memAlloc.allocationSize = memReqs.size;
+	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &memAlloc.memoryTypeIndex);
+	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &stagingBuffer.memory));
+	vkTools::checkResult(vkMapMemory(device, stagingBuffer.memory, 0, storageBufferSize, 0, &data));
+	memcpy(data, vertexBuffer.data(), storageBufferSize);
+	vkUnmapMemory(device, stagingBuffer.memory);
+	vkTools::checkResult(vkBindBufferMemory(device, stagingBuffer.buffer, stagingBuffer.memory, 0));
+
+	createSetupCommandBuffer();
+
+	VkBufferCopy copyRegion = {};
+	copyRegion.size = storageBufferSize;
+	vkCmdCopyBuffer(
+		setupCmdBuffer,
+		stagingBuffer.buffer,
+		storageBuffers.vertex_buffer.buffer,
+		1,
+		&copyRegion);
+
+	flushSetupCommandBuffer();
+
+	vkDestroyBuffer(device, stagingBuffer.buffer, nullptr);
+	vkFreeMemory(device, stagingBuffer.memory, nullptr);
+
+	storageBuffers.vertex_buffer.descriptor.buffer = storageBuffers.vertex_buffer.buffer;
+	storageBuffers.vertex_buffer.descriptor.offset = 0;
+	storageBuffers.vertex_buffer.descriptor.range = storageBufferSize;
 }
 
 void VulkanTerrain::setupDescriptorPool() {
