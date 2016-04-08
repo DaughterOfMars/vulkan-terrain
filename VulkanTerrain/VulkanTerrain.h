@@ -1,87 +1,56 @@
 #pragma once
 
 #include "VulkanBase.h"
-
-struct Vertex {
-	float pos[3];
-	float norm[2];
-};
-
-struct CompressedPt {
-	uint32_t pt;
-};
+#include "Chunk.h"
 
 class VulkanTerrain : VulkanBase {
 public:
-	VulkanTerrain(bool enableValidation);
-	~VulkanTerrain();
-private:
-	struct MeshBufferInfo
-	{
-		VkBuffer buf = VK_NULL_HANDLE;
-		VkDeviceMemory mem = VK_NULL_HANDLE;
-	};
-
-	struct MeshBuffer
-	{
-		MeshBufferInfo vertices;
-		MeshBufferInfo indices;
-		uint32_t indexCount;
-	};
+	struct {
+		glm::ivec3 worldPos;
+	} uboCompute;
 
 	struct {
-		VkPipelineVertexInputStateCreateInfo inputState;
-		std::vector<VkVertexInputBindingDescription> bindingDescriptions;
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-	} vertices;
-
-	struct {
-		MeshBuffer terrain;
-	} meshes;
-
-	struct {
-		glm::mat4 model;
-		glm::mat4 view;
-		glm::mat4 projection;
-	} uboMVP;
-
-	struct {
-		vkTools::VulkanTexture dirt;
-		vkTools::VulkanTexture grass;
-	} uboTextures;
-
-	struct {
-		vkTools::UniformData mvp;
-		vkTools::UniformData textures;
+		vkTools::UniformData compute;
 	} uniformData;
 
 	struct {
-		VkPipeline render;
-	} pipelines;
+		vkTools::VulkanTexture triTable;
+	} textures;
 
 	struct {
-		glm::vec4 pos;
-		glm::vec4 dir;
-		glm::vec4 up;
-	} cam;
+		vkTools::UniformData vertex_buffer;
+		vkTools::UniformData index_buffer;
+	} storageBuffers;
 
-	VkPipelineLayout pipelineLayout;
-	VkDescriptorSet descriptorSet;
-	VkDescriptorSetLayout descriptorSetLayout;
+	struct {
+		VkPipeline render;
+		VkPipeline compute;
+	} pipelines;
 
-	float moveSpeed;
-	float sprintSpeed;
+	VkQueue computeQueue;
+	VkCommandBuffer computeCmdBuffer;
+	VkPipelineLayout computePipelineLayout;
+	VkDescriptorSet computeDescriptorSet;
+	VkDescriptorSetLayout computeDescriptorSetLayout;
+
+	Chunk *currentChunk;
+
+	VulkanTerrain();
+	~VulkanTerrain();
 
 	void loadTextures();
-	void buildCommandBuffers();
+	void buildComputeCommandBuffer();
 	void draw();
+	void prepareStorageBuffers();
 	void setupDescriptorPool();
 	void setupDescriptorSetLayout();
 	void setupDescriptorSet();
-	void preparePipelines();
+	void preparePipeline();
+	void createComputeCommandBuffer();
 	void prepareUniformBuffers();
 	void updateUniformBuffers();
+	void getComputeQueue();
 	void prepare();
-	virtual void render();
-	void handleMessages();
+	void render();
 };
+

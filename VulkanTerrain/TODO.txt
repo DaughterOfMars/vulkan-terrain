@@ -1,16 +1,14 @@
-VulkanTerrain.cpp
-Camera.h
-Camera.cpp
-Chunk.cpp
-
-Render Pass
-	Vert
-		attribute vec3 vPosition
-		attribute vec3 vNormal
-		uniform mat4 view
-		uniform mat4 proj
-	Frag
-		uniform sampler2D grassTexture
-		uniform sampler2D dirtTextured
+Mesh
+	cleanup
+	load mesh
+	load textures
+	draw
+	prepare uniform buffers
+	update uniform buffers
+	handle messages
+VulkanTerrain
+	initializer
+	cleanup
+	preparestoragebuffers
 
 

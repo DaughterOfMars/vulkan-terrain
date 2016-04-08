@@ -24,12 +24,12 @@
 
 class VulkanBase {
 private:
-	bool enableValidation = false;
 	float fpsTimer = 0.0f;
 	VkResult createInstance(bool enableValidation);
 	VkResult createDevice(VkDeviceQueueCreateInfo requestedQueues, bool enableValidation);
 	std::string getWindowTitle();
 protected:
+	bool enableValidation = false;
 	float frameTimer = 1.0f;
 	uint32_t frameCounter = 0;
 	VkInstance instance;
@@ -134,7 +134,7 @@ public:
 
 	void renderLoop();
 
-	void submitPrePresentBarrient(VkImage image);
+	void submitPrePresentBarrier(VkImage image);
 	void submitPostPresentBarrier(VkImage image);
 
 	VkSubmitInfo prepareSubmitInfo(

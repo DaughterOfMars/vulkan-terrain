@@ -307,7 +307,7 @@ void VulkanBase::renderLoop() {
 	}
 }
 
-void VulkanBase::submitPrePresentBarrient(VkImage image) {
+void VulkanBase::submitPrePresentBarrier(VkImage image) {
 	VkCommandBufferBeginInfo cmdBufInfo = vkTools::initializers::commandBufferBeginInfo();
 
 	vkTools::checkResult(vkBeginCommandBuffer(prePresentCmdBuffer, &cmdBufInfo));
