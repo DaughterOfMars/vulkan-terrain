@@ -8,6 +8,49 @@ VulkanTerrain::~VulkanTerrain() {
 
 }
 
+void VulkanTerrain::loadMesh() {
+	std::vector<Vertex> vertexBuffer;
+	std::vector<uint32_t> indexBuffer;
+
+	std::vector<Chunk> chunks;
+	int pos[3] = { (int)meshRenderer->cam->pos.x%Chunk::CHUNK_SIZE, (int)meshRenderer->cam->pos.y%Chunk::CHUNK_SIZE, (int)meshRenderer->cam->pos.z%Chunk::CHUNK_SIZE };
+	for(int x = pos[0] - 10*Chunk::CHUNK_SIZE, 
+			y = pos[1] - 10*Chunk::CHUNK_SIZE, 
+			z = pos[2] - 10*Chunk::CHUNK_SIZE;
+			x < pos[0] + 10*Chunk::CHUNK_SIZE && 
+			y < pos[1] + 10*Chunk::CHUNK_SIZE && 
+			z < pos[2] + 10*Chunk::CHUNK_SIZE;){ 
+		chunks.push_back(Chunk(x, y, z));
+	}
+	for (Chunk c : chunks) {
+		// TODO: run compute shader here
+		readStorageBuffers(vertexBuffer, indexBuffer);
+	}
+
+	createBuffer(
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		vertexBuffer.size() * sizeof(Vertex),
+		vertexBuffer.data(),
+		&meshRenderer->meshes.terrain.vertices.buf,
+		&meshRenderer->meshes.terrain.vertices.mem);
+
+	createBuffer(
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		indexBuffer.size() * sizeof(uint32_t),
+		indexBuffer.data(),
+		&meshRenderer->meshes.terrain.indices.buf,
+		&meshRenderer->meshes.terrain.indices.mem);
+
+	meshRenderer->meshes.terrain.indexCount = indexBuffer.size();
+
+	vertexBuffer.clear();
+	indexBuffer.clear();
+}
+
+void VulkanTerrain::loadTextures() {
+
+}
+
 void VulkanTerrain::buildComputeCommandBuffer() {
 	// Only need to define one command buffer for compute pass, 
 	// as there are no framebuffers

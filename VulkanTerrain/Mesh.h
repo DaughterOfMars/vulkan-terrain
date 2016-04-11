@@ -31,6 +31,8 @@ public:
 		MeshBuffer terrain;
 	} meshes;
 
+	Camera *cam;
+
 private:
 	struct {
 		VkPipelineVertexInputStateCreateInfo inputState;
@@ -61,14 +63,11 @@ private:
 	VkDescriptorSet descriptorSetPostCompute;
 	VkDescriptorSetLayout descriptorSetLayout;
 
-	Camera *cam;
-
 	float moveSpeed;
 	float sprintSpeed;
 
 	bool keyboardState[256] = { false };
 
-	void loadMesh();
 	void loadTextures();
 	void buildCommandBuffers();
 	void draw();

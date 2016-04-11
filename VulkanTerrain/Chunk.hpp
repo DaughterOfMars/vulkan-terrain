@@ -14,8 +14,4 @@ public:
 	~Chunk() {
 
 	};
-
-	bool IsEmpty() {
-
-	}
 };

@@ -1,7 +1,7 @@
 Mesh
 	cleanup
-	load mesh
 	handle messages
 VulkanTerrain
 	initializer
 	cleanup
+	load textures

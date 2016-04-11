@@ -40,6 +40,7 @@ public:
 	VulkanTerrain(bool enableValidation);
 	~VulkanTerrain();
 
+	void loadMesh();
 	void loadTextures();
 	void buildComputeCommandBuffer();
 	void draw();
