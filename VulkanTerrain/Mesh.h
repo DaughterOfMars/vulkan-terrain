@@ -5,7 +5,7 @@
 
 struct Vertex {
 	float pos[3];
-	float norm[2];
+	float norm[3];
 };
 
 class Mesh : VulkanBase {

@@ -34,11 +34,45 @@ void VulkanTerrain::draw() {
 }
 
 void VulkanTerrain::prepareStorageBuffers() {
-	float destPosX = 0.0f;
-	float destPosY = 0.0f;
+	uint32_t vertexBufferMaxSize = 32*32*32*3 * sizeof(Vertex);
+	uint32_t indexBufferMaxSize = 32*32*32*5*3 * sizeof(uint32_t);
+	VkMemoryAllocateInfo memAlloc = vkTools::initializers::memoryAllocateInfo();
+	VkMemoryRequirements memReqs;
 
+	VkBufferCreateInfo vBufferInfo =
+		vkTools::initializers::bufferCreateInfo(
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			vertexBufferMaxSize);
+	VkBufferCreateInfo iBufferInfo =
+		vkTools::initializers::bufferCreateInfo(
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			indexBufferMaxSize);
+
+	// Create a buffer on the GPU to hold the data
+	vkTools::checkResult(vkCreateBuffer(device, &vBufferInfo, nullptr, &storageBuffers.vertex_buffer.buffer));
+	// Get the memory needed by this buffer
+	vkGetBufferMemoryRequirements(device, storageBuffers.vertex_buffer.buffer, &memReqs);
+	memAlloc.allocationSize = memReqs.size;
+	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memAlloc.memoryTypeIndex);
+	// Allocate space for buffer on GPU and store the address in stagingBuffer.memory
+	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &storageBuffers.vertex_buffer.memory));
+	// Bind the buffer
+	vkTools::checkResult(vkBindBufferMemory(device, storageBuffers.vertex_buffer.memory, storageBuffers.vertex_buffer.memory, 0));
+
+	// Repeat for index buffer
+	vkTools::checkResult(vkCreateBuffer(device, &iBufferInfo, nullptr, &storageBuffers.index_buffer.buffer));
+	vkGetBufferMemoryRequirements(device, storageBuffers.index_buffer.buffer, &memReqs);
+	memAlloc.allocationSize = memReqs.size;
+	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memAlloc.memoryTypeIndex);
+	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &storageBuffers.index_buffer.memory));
+	vkTools::checkResult(vkBindBufferMemory(device, storageBuffers.index_buffer.memory, storageBuffers.index_buffer.memory, 0));
+}
+
+void VulkanTerrain::readStorageBuffers(std::vector<Vertex> & vertexBuffer_complete, std::vector<uint32_t> & indexBuffer_complete) {
 	std::vector<Vertex> vertexBuffer;
-	uint32_t storageBufferSize = 32*32*32 * sizeof(Vertex);
+	std::vector<uint32_t> indexBuffer;
+	uint32_t vertexBufferMaxSize = 32 * 32 * 32 * 3 * sizeof(Vertex);
+	uint32_t indexBufferMaxSize = 32 * 32 * 32 * 5 * 3 * sizeof(uint32_t);
 	VkMemoryAllocateInfo memAlloc = vkTools::initializers::memoryAllocateInfo();
 	VkMemoryRequirements memReqs;
 
@@ -47,41 +81,78 @@ void VulkanTerrain::prepareStorageBuffers() {
 	struct StagingBuffer {
 		VkDeviceMemory memory;
 		VkBuffer buffer;
-	} stagingBuffer;
+	} vertexReadBuffer, indexReadBuffer;
 
 	VkBufferCreateInfo vBufferInfo =
 		vkTools::initializers::bufferCreateInfo(
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			storageBufferSize);
-	vkTools::checkResult(vkCreateBuffer(device, &vBufferInfo, nullptr, &stagingBuffer.buffer));
-	vkGetBufferMemoryRequirements(device, stagingBuffer.buffer, &memReqs);
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			vertexBufferMaxSize);
+	VkBufferCreateInfo iBufferInfo =
+		vkTools::initializers::bufferCreateInfo(
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			indexBufferMaxSize);
+
+	// Create local buffers to copy data from the GPU into
+	vkTools::checkResult(vkCreateBuffer(device, &vBufferInfo, nullptr, &vertexReadBuffer.buffer));
+	vkGetBufferMemoryRequirements(device, vertexReadBuffer.buffer, &memReqs);
 	memAlloc.allocationSize = memReqs.size;
 	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &memAlloc.memoryTypeIndex);
-	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &stagingBuffer.memory));
-	vkTools::checkResult(vkMapMemory(device, stagingBuffer.memory, 0, storageBufferSize, 0, &data));
-	memcpy(data, vertexBuffer.data(), storageBufferSize);
-	vkUnmapMemory(device, stagingBuffer.memory);
-	vkTools::checkResult(vkBindBufferMemory(device, stagingBuffer.buffer, stagingBuffer.memory, 0));
+	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &vertexReadBuffer.memory));
+	vkTools::checkResult(vkBindBufferMemory(device, vertexReadBuffer.buffer, vertexReadBuffer.memory, 0));
+
+	vkTools::checkResult(vkCreateBuffer(device, &iBufferInfo, nullptr, &indexReadBuffer.buffer));
+	vkGetBufferMemoryRequirements(device, indexReadBuffer.buffer, &memReqs);
+	memAlloc.allocationSize = memReqs.size;
+	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &memAlloc.memoryTypeIndex);
+	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &indexReadBuffer.memory));
+	vkTools::checkResult(vkBindBufferMemory(device, indexReadBuffer.buffer, indexReadBuffer.memory, 0));
 
 	createSetupCommandBuffer();
 
 	VkBufferCopy copyRegion = {};
-	copyRegion.size = storageBufferSize;
+	copyRegion.size = vertexBufferMaxSize;
 	vkCmdCopyBuffer(
 		setupCmdBuffer,
-		stagingBuffer.buffer,
 		storageBuffers.vertex_buffer.buffer,
+		vertexReadBuffer.buffer,
+		1,
+		&copyRegion);
+
+	copyRegion.size = indexBufferMaxSize;
+	vkCmdCopyBuffer(
+		setupCmdBuffer,
+		storageBuffers.index_buffer.buffer,
+		indexReadBuffer.buffer,
 		1,
 		&copyRegion);
 
 	flushSetupCommandBuffer();
 
-	vkDestroyBuffer(device, stagingBuffer.buffer, nullptr);
-	vkFreeMemory(device, stagingBuffer.memory, nullptr);
+	// Copy data from the GPU buffer to local vectors
+	vkTools::checkResult(vkMapMemory(device, vertexReadBuffer.memory, 0, vertexBufferMaxSize, 0, &data));
+	vertexBuffer.resize(vertexBufferMaxSize);
+	memcpy(&vertexBuffer[0], data, vertexBufferMaxSize);
+	vkUnmapMemory(device, vertexReadBuffer.memory);
 
-	storageBuffers.vertex_buffer.descriptor.buffer = storageBuffers.vertex_buffer.buffer;
-	storageBuffers.vertex_buffer.descriptor.offset = 0;
-	storageBuffers.vertex_buffer.descriptor.range = storageBufferSize;
+	vkTools::checkResult(vkMapMemory(device, indexReadBuffer.memory, 0, indexBufferMaxSize, 0, &data));
+	vertexBuffer.resize(indexBufferMaxSize);
+	memcpy(&vertexBuffer[0], data, indexBufferMaxSize);
+	vkUnmapMemory(device, indexReadBuffer.memory);
+
+	for (auto v : vertexBuffer) {
+		if (&v != nullptr)
+			vertexBuffer_complete.push_back(v);
+	}
+	for (auto i : indexBuffer) {
+		if (&i != nullptr)
+			indexBuffer_complete.push_back(i + vertexBuffer_complete.size());
+	}
+
+	// Cleanup buffers
+	vkDestroyBuffer(device, vertexReadBuffer.buffer, nullptr);
+	vkFreeMemory(device, vertexReadBuffer.memory, nullptr);
+	vkDestroyBuffer(device, indexReadBuffer.buffer, nullptr);
+	vkFreeMemory(device, indexReadBuffer.memory, nullptr);
 }
 
 void VulkanTerrain::setupDescriptorPool() {
@@ -107,11 +178,11 @@ void VulkanTerrain::setupDescriptorSetLayout() {
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			0),
 		vkTools::initializers::descriptorSetLayoutBinding(
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			1),
 		vkTools::initializers::descriptorSetLayoutBinding(
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			2),
 		vkTools::initializers::descriptorSetLayoutBinding(

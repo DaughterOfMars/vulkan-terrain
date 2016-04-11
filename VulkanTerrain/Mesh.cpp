@@ -14,6 +14,10 @@ Mesh::~Mesh() {
 
 }
 
+void Mesh::loadMesh() {
+
+}
+
 void Mesh::loadTextures() {
 	textureLoader->loadTexture(
 		"./../data/textures/dirt.png",

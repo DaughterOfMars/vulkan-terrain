@@ -7,17 +7,21 @@ layout(std140, binding = 0) uniform UBO{
 	ivec3 WorldPosition
 };
 
+struct Vertex {
+	vec3 worldPosition;
+	vec3 normal;
+};
+
 layout (std430, binding = 0) buffer vertex_buffer{
-	vec3 worldPosition[];
-	vec3 normal[];
-}
+	Vertex vertex[];
+};
 
 layout (std430, binding = 1) buffer index_buffer{
 	uint index[];
-}
+};
 
-uint vertex_buffer_index = 0;
-uint index_buffer_index = 0;
+shared uint vertex_buffer_index = 0;
+shared uint index_buffer_index = 0;
 
 int DensityTextureMargin = 1;
 int DensityTextureSize = 32;
@@ -241,8 +245,8 @@ uint generateVert(ivec3 pos, uint edge){
 	gradient.y = DensityMap[UVW.x][UVW.y + d][UVW.z] - DensityMap[UVW.x][UVW.y-d][UVW.z];
 	gradient.z = DensityMap[UVW.x][UVW.y][UVW.z + d] - DensityMap[UVW.x][UVW.y][UVW.z-d];
 	
-	worldPosition[vertex_buffer_index] = vec3(WorldPosition+vertex);
-	normals[vertex_buffer_index] = -normalize(gradient);
+	vertex_buffer.vertex[vertex_buffer_index].worldPosition = vec3(WorldPosition+vertex);
+	vertex_buffer.vertex[vertex_buffer_index].normals = -normalize(gradient);
 	return vertex_buffer_index++;
 }
 
@@ -291,17 +295,21 @@ void listVertsToGen(ivec3 pos, uint caseID){
 	// Check edge 3
 	if (v0Status != ((caseID & v3) >> 3))
 	{
-		generateVert(pos, 3, caseID);
+		ID = generateVert(pos, 3, caseID);
+		writeVertexIDs(pos, 3, ID);
 	}
 
 	// Check edge 8
 	if (v0Status != ((caseID & v4) >> 4))
 	{
-		generateVert(pos, 8, caseID);
+		ID = generateVert(pos, 8, caseID);
+		writeVertexIDs(pos, 8, ID);
 	}
 }
 
 void main(){
+	vertex_buffer.length = 0;
+	index_buffer.length = 0;
 	ivec3 pos = ivec3(gl_GlobalInvocationID);
 	d = density(pos)
 	DensityMap[pos.x][pos.y][pos.z] = d;

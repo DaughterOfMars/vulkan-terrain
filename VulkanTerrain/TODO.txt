@@ -5,5 +5,3 @@ Mesh
 VulkanTerrain
 	initializer
 	cleanup
-	preparestoragebuffers
-		- deal with index storage buffer

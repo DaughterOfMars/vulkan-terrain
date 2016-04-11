@@ -44,6 +44,7 @@ public:
 	void buildComputeCommandBuffer();
 	void draw();
 	void prepareStorageBuffers();
+	void readStorageBuffers(std::vector<Vertex> &vertexBuffer_complete, std::vector<uint32_t> &indexBuffer_complete);
 	void setupDescriptorPool();
 	void setupDescriptorSetLayout();
 	void setupDescriptorSet();
