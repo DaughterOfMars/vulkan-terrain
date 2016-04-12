@@ -3,8 +3,9 @@
 #include "VulkanBase.h"
 #include "Chunk.hpp"
 #include "Mesh.h"
+#include "MarchingCubesLookup.h"
 
-class VulkanTerrain : VulkanBase {
+class VulkanTerrain : public VulkanBase {
 public:
 	struct {
 		glm::ivec3 worldPos;
@@ -56,5 +57,6 @@ public:
 	void getComputeQueue();
 	void prepare();
 	void render();
+	void compute();
 };
 

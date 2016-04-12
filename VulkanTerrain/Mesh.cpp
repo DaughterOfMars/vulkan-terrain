@@ -300,6 +300,7 @@ void Mesh::render() {
 	vkDeviceWaitIdle(device);
 }
 
-void Mesh::handleMessages() {
-
+void Mesh::handleMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	VulkanBase::handleMessages(hWnd, uMsg, wParam, lParam);
+	// Handle camera and input here
 }

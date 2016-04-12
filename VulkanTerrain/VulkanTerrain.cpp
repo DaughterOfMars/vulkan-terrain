@@ -48,7 +48,7 @@ void VulkanTerrain::loadMesh() {
 }
 
 void VulkanTerrain::loadTextures() {
-
+	// Load the tri table array into a VulkanTexture
 }
 
 void VulkanTerrain::buildComputeCommandBuffer() {
@@ -372,10 +372,18 @@ void VulkanTerrain::prepare() {
 	setupDescriptorPool();
 	setupDescriptorSet();
 	buildComputeCommandBuffer();
+	compute();
 	prepared = true;
 }
 
 void VulkanTerrain::render() {
+	while (TRUE) {
+		meshRenderer->renderLoop();
+		compute();
+	}
+}
+
+void VulkanTerrain::compute() {
 	if (!prepared)
 		return;
 	vkDeviceWaitIdle(device);

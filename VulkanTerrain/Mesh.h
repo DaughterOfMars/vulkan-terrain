@@ -8,7 +8,7 @@ struct Vertex {
 	float norm[3];
 };
 
-class Mesh : VulkanBase {
+class Mesh : public VulkanBase {
 public:
 	Mesh(bool enableValidation);
 	~Mesh();
@@ -32,6 +32,7 @@ public:
 	} meshes;
 
 	Camera *cam;
+	HWND winHandle;
 
 private:
 	struct {
@@ -80,5 +81,10 @@ private:
 	void updateUniformBuffers();
 	void prepare();
 	virtual void render();
-	void handleMessages();
+public:
+	void handleMessages(
+		HWND hWnd,
+		UINT uMsg,
+		WPARAM wParam,
+		LPARAM lParam);
 };

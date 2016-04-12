@@ -278,7 +278,7 @@ VkBool32 VulkanBase::getMemoryType(uint32_t typeBits, VkFlags properties, uint32
 
 void VulkanBase::renderLoop() {
 	MSG msg;
-	while (TRUE){
+	while (doRender){
 		auto tStart = std::chrono::high_resolution_clock::now();
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)){
 			if (msg.message == WM_QUIT)

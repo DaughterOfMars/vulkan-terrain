@@ -61,6 +61,7 @@ protected:
 	vkTools::VulkanTextureLoader *textureLoader = nullptr;
 public:
 	bool prepared = false;
+	bool doRender = true;
 	uint32_t width = 1280;
 	uint32_t height = 720;
 
@@ -88,6 +89,7 @@ public:
 	void initVulkan(bool enableValidation);
 
 	void setupConsole(std::string title);
+public:
 	HWND setupWindow(HINSTANCE hinstance, WNDPROC wndproc);
 	virtual void handleMessages(
 		HWND hWnd, 
