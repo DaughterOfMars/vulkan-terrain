@@ -7,6 +7,10 @@
 
 class VulkanTerrain : public VulkanBase {
 public:
+	const uint32_t VISIBILITY_DISTANCE = 8;
+	//                            chunks in x axis              chunks in y axis              chunks in z axis
+	const uint32_t CHUNK_COUNT = (2 * VISIBILITY_DISTANCE + 1) * (2 * VISIBILITY_DISTANCE + 1) * (VISIBILITY_DISTANCE + 1);
+	
 	struct {
 		glm::ivec3 worldPos;
 	} uboCompute;
@@ -35,7 +39,6 @@ public:
 	VkDescriptorSet computeDescriptorSet;
 	VkDescriptorSetLayout computeDescriptorSetLayout;
 
-	Chunk *currentChunk;
 	Mesh *meshRenderer;
 
 	VulkanTerrain(bool enableValidation);
@@ -53,7 +56,7 @@ public:
 	void preparePipeline();
 	void createComputeCommandBuffer();
 	void prepareUniformBuffers();
-	void updateUniformBuffers();
+	void updateUniformBuffers(Chunk currentChunk);
 	void getComputeQueue();
 	void prepare();
 	void render();
