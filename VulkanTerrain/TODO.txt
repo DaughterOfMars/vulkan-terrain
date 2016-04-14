@@ -1,6 +1,5 @@
 Mesh
 	cleanup
 VulkanTerrain
-	initializer
 	cleanup
 	load textures

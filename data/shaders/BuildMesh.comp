@@ -1,27 +1,27 @@
 #version 450
 
-layout(local_size_x = 32, local_size_y = 32, local_z_size = 32) in;
-layout(binding = 0, r32f) uniform isampler2D triTable;
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 32) in;
+layout(binding = 0) uniform isampler2D triTable;
 
 layout(std140, binding = 0) uniform UBO{
-	ivec3 WorldPosition
+	ivec3 ChunkPosition;
 };
 
 struct Vertex {
-	vec3 worldPosition;
-	vec3 normal;
+	vec4 worldPosition;
+	vec4 normal;
 };
 
 layout (std430, binding = 0) buffer vertex_buffer{
 	Vertex vertex[];
-};
+} vbuf;
 
 layout (std430, binding = 1) buffer index_buffer{
 	uint index[];
-};
+} ibuf;
 
-shared uint vertex_buffer_index = 0;
-shared uint index_buffer_index = 0;
+shared uint vertex_buffer_index;
+shared uint index_buffer_index;
 
 int DensityTextureMargin = 1;
 int DensityTextureSize = 32;
@@ -191,9 +191,9 @@ float snoise(vec3 v)
 		dot(p2, x2), dot(p3, x3)));
 }
 
-float density(ivec3 ChunkPosition)
+float density(ivec3 PositionInChunk)
 {
-	vec3 WorldPoint = vec3(WorldPosition + ChunkPosition + vec3(0, 16, 0));
+	vec3 WorldPoint = vec3(ChunkPosition + PositionInChunk + vec3(0, 16, 0));
 	float density = -WorldPoint.y;
 
 	float angle = .9;
@@ -227,6 +227,17 @@ float density(ivec3 ChunkPosition)
 	return density;
 }
 
+float interpolateDensity(vec3 pos){
+	vec3 interpVals = mod(pos, 10);
+	vec4 collapseZ = vec4(DensityMap[int(pos.x)][int(pos.y)][int(pos.z)] * interpVals.z + DensityMap[int(pos.x)][int(pos.y)][int(ceil(pos.z))] * (1.0 - interpVals.z), 
+						  DensityMap[int(pos.x)][int(ceil(pos.y))][int(pos.z)] * interpVals.z + DensityMap[int(pos.x)][int(ceil(pos.y))][int(ceil(pos.z))] * (1.0 - interpVals.z),
+						  DensityMap[int(ceil(pos.x))][int(pos.y)][int(pos.z)] * interpVals.z + DensityMap[int(ceil(pos.x))][int(pos.y)][int(ceil(pos.z))] * (1.0 - interpVals.z),  
+						  DensityMap[int(ceil(pos.x))][int(ceil(pos.y))][int(pos.z)] * interpVals.z + DensityMap[int(ceil(pos.x))][int(ceil(pos.y))][int(ceil(pos.z))] * (1.0 - interpVals.z));
+	vec2 collapseY = vec2(collapseZ.x * interpVals.y + collapseZ.y * (1.0 - interpVals.y),
+						  collapseZ.z * interpVals.y + collapseZ.w * (1.0 - interpVals.y));
+	return collapseY.x * interpVals.x + collapseY.y * (1.0 - interpVals.x);
+}
+
 uint generateVert(ivec3 pos, uint edge){
 	ivec2 verts = edge_to_verts[edge];
 	ivec3 EdgeVert1 = vert_to_texcoord[verts.x] + pos;
@@ -241,12 +252,12 @@ uint generateVert(ivec3 pos, uint edge){
 	vec3 UVW = (vertex + DensityTextureMargin) * d;
 	
 	vec3 gradient;
-	gradient.x = DensityMap[UVW.x + d][UVW.y][UVW.z] - DensityMap[UVW.x-d][UVW.y][UVW.z];
-	gradient.y = DensityMap[UVW.x][UVW.y + d][UVW.z] - DensityMap[UVW.x][UVW.y-d][UVW.z];
-	gradient.z = DensityMap[UVW.x][UVW.y][UVW.z + d] - DensityMap[UVW.x][UVW.y][UVW.z-d];
+	gradient.x = interpolateDensity(vec3(UVW.x + d, UVW.yz)) - interpolateDensity(vec3(UVW.x - d, UVW.yz));
+	gradient.y = interpolateDensity(vec3(UVW.x, UVW.y + d, UVW.z)) - interpolateDensity(vec3(UVW.x, UVW.y - d, UVW.z));
+	gradient.z = interpolateDensity(vec3(UVW.xy, UVW.z + d)) - interpolateDensity(vec3(UVW.xy, UVW.z - d));
 	
-	vertex_buffer.vertex[vertex_buffer_index].worldPosition = vec3(WorldPosition+vertex);
-	vertex_buffer.vertex[vertex_buffer_index].normals = -normalize(gradient);
+	vbuf.vertex[vertex_buffer_index].worldPosition = vec4(vertex+ChunkPosition, 1.0);
+	vbuf.vertex[vertex_buffer_index].normal = vec4(-normalize(gradient), 1.0);
 	return vertex_buffer_index++;
 }
 
@@ -264,9 +275,9 @@ void generateIndices(ivec3 pos, uint caseID){
 			voxel.x += EdgeOffsets[vertexEdges[i]];
 			indices[i] = vertexIDs[voxel.x][voxel.y][voxel.z];
 		}
-		index[index_buffer_index++] = indices[0];
-		index[index_buffer_index++] = indices[1];
-		index[index_buffer_index++] = indices[2];
+		ibuf.index[index_buffer_index++] = indices[0];
+		ibuf.index[index_buffer_index++] = indices[1];
+		ibuf.index[index_buffer_index++] = indices[2];
 	}
 }
 
@@ -283,45 +294,48 @@ void listVertsToGen(ivec3 pos, uint caseID){
 	uint v4 = 1 << 4;
 
 	uint v0Status = caseID & v0;
-	int ID;
+	uint ID;
 	
 	// Check edge 0
 	if (v0Status != ((caseID & v1) >> 1))
 	{
-		ID = generateVert(pos, 0, caseID);
+		ID = generateVert(pos, 0);
 		writeVertexIDs(pos, 0, ID);
 	}
 
 	// Check edge 3
 	if (v0Status != ((caseID & v3) >> 3))
 	{
-		ID = generateVert(pos, 3, caseID);
+		ID = generateVert(pos, 3);
 		writeVertexIDs(pos, 3, ID);
 	}
 
 	// Check edge 8
 	if (v0Status != ((caseID & v4) >> 4))
 	{
-		ID = generateVert(pos, 8, caseID);
+		ID = generateVert(pos, 8);
 		writeVertexIDs(pos, 8, ID);
 	}
 }
 
 void main(){
-	vertex_buffer.length = 0;
-	index_buffer.length = 0;
+	//vertex_buffer.length = 0;
+	//index_buffer.length = 0;
+	vertex_buffer_index = 0;
+	index_buffer_index = 0;
+	barrier();
 	ivec3 pos = ivec3(gl_GlobalInvocationID);
-	d = density(pos)
+	float d = density(pos);
 	DensityMap[pos.x][pos.y][pos.z] = d;
 	barrier(); // Ensure that density values are complete
 	uint caseID = 0;
-	for(int i = 7; i >= 0; --i)
-		caseID = caseID | (d > 0 ? 1 : 0) << i;
-	if(caseID != 0 && caseID != 255)
+	for(uint i = 7; i >= 0; --i)
+		caseID = caseID | (d > 0 ? uint(1) : uint(0)) << i;
+	if(caseID != 0 && caseID != 255){
 		listVertsToGen(pos, caseID);
 		barrier(); // Ensure that vertex IDs are filled in
 		generateIndices(pos, caseID);
-	else
+	} else
 		barrier(); // for uniformity purposes
 	
 }
