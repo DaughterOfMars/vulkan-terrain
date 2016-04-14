@@ -1,6 +1,5 @@
 Mesh
 	cleanup
-	handle messages
 VulkanTerrain
 	initializer
 	cleanup

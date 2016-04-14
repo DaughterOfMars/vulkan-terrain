@@ -7,6 +7,10 @@ Mesh::Mesh(bool enableValidation) : VulkanBase(enableValidation) {
 
 	moveSpeed = 50.0f;
 	sprintSpeed = 100.0f;
+
+	GetClientRect(winHandle, &rect);
+	ClientToScreen(winHandle, reinterpret_cast<POINT*>(&rect.left));
+	centerPos = glm::vec2(rect.left + (float)width / 2.0f, rect.top + (float)height / 2.0f);
 }
 
 Mesh::~Mesh() {
@@ -295,12 +299,67 @@ void Mesh::prepare() {
 void Mesh::render() {
 	if (!prepared)
 		return;
+	updateCamera();
 	vkDeviceWaitIdle(device);
 	draw();
 	vkDeviceWaitIdle(device);
 }
 
+void Mesh::viewChanged() {
+	updateUniformBuffers();
+}
+
+// Updates the camera once per frame
+void Mesh::updateCamera() {
+	float speed;
+	if (keyboardState[VK_SHIFT])
+		speed = sprintSpeed;
+	else
+		speed = moveSpeed;
+	if (keyboardState[KEYBOARD_W]) {
+		cam->translate(Direction::Forward, speed*frameTimer);
+	}
+	if (keyboardState[KEYBOARD_S]) {
+		cam->translate(Direction::Backward, speed*frameTimer);
+	}
+	if (keyboardState[KEYBOARD_A]) {
+		cam->translate(Direction::Left, speed*frameTimer);
+	}
+	if (keyboardState[KEYBOARD_D]) {
+		cam->translate(Direction::Right, speed*frameTimer);
+	}
+	cam->rotate(Axis::V, speed*frameTimer*mouseDelta[0]);
+	if(true)
+		cam->rotate(Axis::U, speed*frameTimer*mouseDelta[1]);
+	SetCursorPos(centerPos.x, centerPos.y);
+	viewChanged();
+}
+
 void Mesh::handleMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	VulkanBase::handleMessages(hWnd, uMsg, wParam, lParam);
-	// Handle camera and input here
+	switch (uMsg) {
+	case WM_KEYDOWN:
+	{
+		keyboardState[wParam] = true;
+		switch (wParam) {
+		case VK_ESCAPE:
+			exit(0);
+			break;
+		}
+		break;
+	}
+	case WM_KEYUP:
+	{
+		keyboardState[wParam] = false;
+		break;
+	}
+	case WM_MOUSEMOVE:
+	{
+		int32_t posx = LOWORD(lParam);
+		int32_t posy = HIWORD(lParam);
+		mouseDelta[0] = posx + rect.left - centerPos.x;
+		mouseDelta[1] = posy + rect.top - centerPos.y;
+		break;
+	}
+	}
 }

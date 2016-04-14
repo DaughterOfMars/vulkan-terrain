@@ -3,6 +3,26 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define FORWARD glm::normalize(dir)
+#define BACKWARD glm::normalize(-dir)
+#define LEFT glm::normalize(glm::cross(up, dir))
+#define RIGHT glm::normalize(glm::cross(dir, up))
+
+#define UAXIS glm::cross(dir, up)
+#define VAXIS up
+#define NAXIS dir
+
+enum Direction {
+	Forward,
+	Backward,
+	Left,
+	Right
+};
+
+enum Axis {
+	U, V, N
+};
+
 class Camera {
 public:
 	glm::mat4 projection;
@@ -32,6 +52,40 @@ public:
 	}
 
 	void update() {
-		
+		view = glm::lookAt(pos, pos + dir, up);
+	}
+
+	void translate(Direction direction, float magnitude) {
+		switch (direction) {
+		case Forward:
+			pos = glm::translate(glm::mat4(), magnitude*FORWARD)*glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			break;
+		case Backward:
+			pos = glm::translate(glm::mat4(), magnitude*BACKWARD)*glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			break;
+		case Left:
+			pos = glm::translate(glm::mat4(), magnitude*LEFT)*glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			break;
+		case Right:
+			pos = glm::translate(glm::mat4(), magnitude*RIGHT)*glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			break;
+		}
+		update();
+	}
+
+	void rotate(Axis axis, float angle) {
+		// rotate dir about axis by angle
+		switch (axis) {
+		case U:
+			dir = glm::rotate(glm::mat4(), angle, UAXIS) * glm::vec4(dir.x, dir.y, dir.z, 1.0f);
+			break;
+		case V:
+			dir = glm::rotate(glm::mat4(), angle, VAXIS) * glm::vec4(dir.x, dir.y, dir.z, 1.0f);
+			break;
+		case N:
+			dir = glm::rotate(glm::mat4(), angle, NAXIS) * glm::vec4(dir.x, dir.y, dir.z, 1.0f);
+			break;
+		}
+		update();
 	}
 };

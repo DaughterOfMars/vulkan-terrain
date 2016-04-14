@@ -3,6 +3,13 @@
 #include "VulkanBase.h"
 #include "Camera.hpp"
 
+#define KEYBOARD_C 0x43
+#define KEYBOARD_P 0x50
+#define KEYBOARD_W 0x57
+#define KEYBOARD_A 0x41
+#define KEYBOARD_S 0x53
+#define KEYBOARD_D 0x44
+
 struct Vertex {
 	float pos[3];
 	float norm[3];
@@ -33,6 +40,8 @@ public:
 
 	Camera *cam;
 	HWND winHandle;
+	RECT rect;
+	glm::vec2 centerPos;
 
 private:
 	struct {
@@ -68,6 +77,7 @@ private:
 	float sprintSpeed;
 
 	bool keyboardState[256] = { false };
+	float mouseDelta[2] = { 0.0f };
 
 	void loadTextures();
 	void buildCommandBuffers();
@@ -81,6 +91,8 @@ private:
 	void updateUniformBuffers();
 	void prepare();
 	virtual void render();
+	void viewChanged();
+	void updateCamera();
 public:
 	void handleMessages(
 		HWND hWnd,
