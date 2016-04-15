@@ -24,7 +24,7 @@
 #else
 #endif
 
-#include <vulkan/vulkan.h>
+#include <vulkan.h>
 #include "vulkantools.h"
 
 #ifdef __ANDROID__

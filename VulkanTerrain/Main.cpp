@@ -16,7 +16,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLin
 	app->meshRenderer->winHandle = app->setupWindow(hInstance, WndProc);
 	app->initSwapChain();
 	app->prepare();
-	app->render;
+	app->render();
 	delete(app);
 	return 0;
 }

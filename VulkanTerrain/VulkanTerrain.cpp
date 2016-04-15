@@ -165,7 +165,7 @@ void VulkanTerrain::prepareStorageBuffers() {
 	// Allocate space for buffer on GPU and store the address in stagingBuffer.memory
 	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &storageBuffers.vertex_buffer.memory));
 	// Bind the buffer
-	vkTools::checkResult(vkBindBufferMemory(device, storageBuffers.vertex_buffer.memory, storageBuffers.vertex_buffer.memory, 0));
+	vkTools::checkResult(vkBindBufferMemory(device, storageBuffers.vertex_buffer.buffer, storageBuffers.vertex_buffer.memory, 0));
 
 	// Repeat for index buffer
 	vkTools::checkResult(vkCreateBuffer(device, &iBufferInfo, nullptr, &storageBuffers.index_buffer.buffer));
@@ -173,7 +173,7 @@ void VulkanTerrain::prepareStorageBuffers() {
 	memAlloc.allocationSize = memReqs.size;
 	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memAlloc.memoryTypeIndex);
 	vkTools::checkResult(vkAllocateMemory(device, &memAlloc, nullptr, &storageBuffers.index_buffer.memory));
-	vkTools::checkResult(vkBindBufferMemory(device, storageBuffers.index_buffer.memory, storageBuffers.index_buffer.memory, 0));
+	vkTools::checkResult(vkBindBufferMemory(device, storageBuffers.index_buffer.buffer, storageBuffers.index_buffer.memory, 0));
 }
 
 void VulkanTerrain::readStorageBuffers(std::vector<Vertex> & vertexBuffer_complete, std::vector<uint32_t> & indexBuffer_complete) {

@@ -41,7 +41,7 @@ void Mesh::buildCommandBuffers() {
 
 	VkClearValue clearValues[2];
 	clearValues[0].color = defaultClearColor;
-	clearValues[1].depthStencil = {1.0f, 0.0f};
+	clearValues[1].depthStencil = {1, 0};
 
 	VkRenderPassBeginInfo renderPassBeginInfo = vkTools::initializers::renderPassBeginInfo();
 	renderPassBeginInfo.renderPass = renderPass;
@@ -98,6 +98,35 @@ void Mesh::draw() {
 	vkTools::checkResult(swapChain.queuePresent(queue, currentBuffer, semaphores.renderComplete));
 
 	vkTools::checkResult(vkQueueWaitIdle(queue));
+}
+
+void Mesh::setupVertexDescriptions() {
+	vertices.bindingDescriptions.resize(1);
+	vertices.bindingDescriptions[0] =
+		vkTools::initializers::vertexInputBindingDescription(
+			0,
+			(3+3)*sizeof(float),
+			VK_VERTEX_INPUT_RATE_VERTEX);
+
+	vertices.attributeDescriptions.resize(2);
+	vertices.attributeDescriptions[0] =
+		vkTools::initializers::vertexInputAttributeDescription(
+			0,
+			0,
+			VK_FORMAT_R32G32B32_SFLOAT,
+			0);
+	vertices.attributeDescriptions[1] =
+		vkTools::initializers::vertexInputAttributeDescription(
+			0,
+			1,
+			VK_FORMAT_R32G32B32_SFLOAT,
+			3 * sizeof(float));
+
+	vertices.inputState = vkTools::initializers::pipelineVertexInputStateCreateInfo();
+	vertices.inputState.vertexBindingDescriptionCount = vertices.bindingDescriptions.size();
+	vertices.inputState.pVertexBindingDescriptions = vertices.bindingDescriptions.data();
+	vertices.inputState.vertexAttributeDescriptionCount = vertices.attributeDescriptions.size();
+	vertices.inputState.pVertexAttributeDescriptions = vertices.attributeDescriptions.data();
 }
 
 void Mesh::setupDescriptorPool() {

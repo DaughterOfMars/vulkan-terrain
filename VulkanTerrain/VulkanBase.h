@@ -14,7 +14,7 @@
 #include <string>
 #include <array>
 
-#include "vulkan/vulkan.h"
+#include "vulkan.h"
 
 #include "base/vulkantools.h"
 #include "base/vulkandebug.h"
@@ -98,8 +98,6 @@ public:
 		LPARAM lParam);
 
 	virtual void render() = 0;
-
-	virtual void viewChanged();
 
 	void createCommandPool();
 	void setupDepthStencil();
