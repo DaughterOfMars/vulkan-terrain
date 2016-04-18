@@ -2,4 +2,3 @@ Mesh
 	cleanup
 VulkanTerrain
 	cleanup
-	load textures

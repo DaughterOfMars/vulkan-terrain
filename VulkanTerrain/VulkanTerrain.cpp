@@ -48,74 +48,6 @@ void VulkanTerrain::loadMesh() {
 	indexBuffer.clear();
 }
 
-void VulkanTerrain::loadTextures() {
-	// Load the tri table array into a VulkanTexture
-	textures.triTable.width = 256;
-	textures.triTable.height = 16;
-	textures.triTable.mipLevels = 1;
-	textures.triTable.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, VK_FORMAT_R32_SINT, &formatProperties);
-
-	VkImageCreateInfo imageCreateInfo = vkTools::initializers::imageCreateInfo();
-	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageCreateInfo.format = VK_FORMAT_R32_SINT;
-	imageCreateInfo.extent = { 256, 16, 1 };
-	imageCreateInfo.mipLevels = 1;
-	imageCreateInfo.arrayLayers = 1;
-	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
-	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-	vkTools::checkResult(vkCreateImage(device, &imageCreateInfo, nullptr, &textures.triTable.image));
-
-	VkMemoryAllocateInfo memAllocInfo = vkTools::initializers::memoryAllocateInfo();
-	VkMemoryRequirements memReqs;
-
-	vkGetImageMemoryRequirements(device, textures.triTable.image, &memReqs);
-	memAllocInfo.allocationSize = memReqs.size;
-	getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &memAllocInfo.memoryTypeIndex);
-
-	vkTools::checkResult(vkAllocateMemory(device, &memAllocInfo, nullptr, &textures.triTable.deviceMemory));
-	vkTools::checkResult(vkBindImageMemory(device, textures.triTable.image, textures.triTable.deviceMemory, 0));
-
-	void * data;
-	vkTools::checkResult(vkMapMemory(device, textures.triTable.deviceMemory, 0, memReqs.size, 0, &data));
-	memcpy(data, &triTable[0][0], 256*16);
-	vkUnmapMemory(device, textures.triTable.deviceMemory);
-
-	VkSamplerCreateInfo sampler = {};
-	sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	sampler.magFilter = VK_FILTER_LINEAR;
-	sampler.minFilter = VK_FILTER_LINEAR;
-	sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler.mipLodBias = 0.0f;
-	sampler.compareOp = VK_COMPARE_OP_NEVER;
-	sampler.minLod = 0.0f;
-	sampler.maxLod = 0.0f;
-	sampler.maxAnisotropy = 8;
-	sampler.anisotropyEnable = VK_TRUE;
-	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-	vkTools::checkResult(vkCreateSampler(device, &sampler, nullptr, &textures.triTable.sampler));
-
-	VkImageViewCreateInfo view = {};
-	view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	view.pNext = NULL;
-	view.image = VK_NULL_HANDLE;
-	view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	view.format = VK_FORMAT_R32_SINT;
-	view.components = { VK_COMPONENT_SWIZZLE_R };
-	view.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	view.subresourceRange.levelCount = 1;
-	view.image = textures.triTable.image;
-	vkTools::checkResult(vkCreateImageView(device, &view, nullptr, &textures.triTable.view));
-}
-
 void VulkanTerrain::buildComputeCommandBuffer() {
 	// Only need to define one command buffer for compute pass, 
 	// as there are no framebuffers
@@ -265,9 +197,8 @@ void VulkanTerrain::readStorageBuffers(std::vector<Vertex> & vertexBuffer_comple
 
 void VulkanTerrain::setupDescriptorPool() {
 	std::vector<VkDescriptorPoolSize> poolSizes = {
-		vkTools::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-		vkTools::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2),
-		vkTools::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
+		vkTools::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2),
+		vkTools::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2)
 	};
 
 	VkDescriptorPoolCreateInfo descriptorPoolInfo =
@@ -286,7 +217,7 @@ void VulkanTerrain::setupDescriptorSetLayout() {
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			0),
 		vkTools::initializers::descriptorSetLayoutBinding(
-			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			1),
 		vkTools::initializers::descriptorSetLayoutBinding(
@@ -294,7 +225,7 @@ void VulkanTerrain::setupDescriptorSetLayout() {
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			2),
 		vkTools::initializers::descriptorSetLayoutBinding(
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
 			VK_SHADER_STAGE_COMPUTE_BIT,
 			3)
 	};
@@ -323,18 +254,17 @@ void VulkanTerrain::setupDescriptorSet() {
 
 	vkTools::checkResult(vkAllocateDescriptorSets(device, &allocInfo, &computeDescriptorSet));
 
-	VkDescriptorImageInfo texDescriptor =
-		vkTools::initializers::descriptorImageInfo(
-			textures.triTable.sampler,
-			textures.triTable.view,
-			VK_IMAGE_LAYOUT_GENERAL);
-
 	std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
 		vkTools::initializers::writeDescriptorSet(
 			computeDescriptorSet,
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			0,
 			&uniformData.compute.descriptor),
+		vkTools::initializers::writeDescriptorSet(
+			computeDescriptorSet,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			0,
+			&uniformData.lookup.descriptor),
 		vkTools::initializers::writeDescriptorSet(
 			computeDescriptorSet,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -344,12 +274,7 @@ void VulkanTerrain::setupDescriptorSet() {
 			computeDescriptorSet,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			2,
-			&storageBuffers.index_buffer.descriptor),
-		vkTools::initializers::writeDescriptorSet(
-			computeDescriptorSet,
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			3,
-			&texDescriptor)
+			&storageBuffers.index_buffer.descriptor)
 	};
 
 	vkUpdateDescriptorSets(device, writeDescriptorSets.size(), writeDescriptorSets.data(), 0, NULL);
@@ -382,6 +307,25 @@ void VulkanTerrain::prepareUniformBuffers() {
 		&uniformData.compute.buffer,
 		&uniformData.compute.memory,
 		&uniformData.compute.descriptor);
+
+	uboLookup.triTable = &triTable;
+
+#define LOOKUP_SIZE 256*16*sizeof(int)
+
+	createBuffer(
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		LOOKUP_SIZE,
+		&uboLookup,
+		&uniformData.lookup.buffer,
+		&uniformData.lookup.memory,
+		&uniformData.lookup.descriptor);
+
+	uint8_t *pData;
+	vkTools::checkResult(vkMapMemory(device, uniformData.lookup.memory, 0, LOOKUP_SIZE, 0, (void**)&pData));
+	memcpy(pData, &uboLookup, LOOKUP_SIZE);
+	vkUnmapMemory(device, uniformData.lookup.memory);
+
+#undef LOOKUP_SIZE
 }
 
 void VulkanTerrain::updateUniformBuffers(Chunk currentChunk) {
@@ -419,13 +363,10 @@ void VulkanTerrain::prepare() {
 	createCommandPool();
 	createSetupCommandBuffer();
 	setupSwapChain();
+	createCommandBuffers();
 	setupRenderPass();
 	createPipelineCache();
-	flushSetupCommandBuffer();
-	createSetupCommandBuffer();
-	textureLoader = new vkTools::VulkanTextureLoader(physicalDevice, device, queue, cmdPool);
 
-	loadTextures();
 	getComputeQueue();
 	createComputeCommandBuffer();
 	prepareStorageBuffers();

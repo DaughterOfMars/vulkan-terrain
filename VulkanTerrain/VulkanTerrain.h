@@ -15,13 +15,15 @@ public:
 		glm::ivec3 worldPos;
 	} uboCompute;
 
+	typedef int table[256][16];
 	struct {
-		vkTools::UniformData compute;
-	} uniformData;
+		table * triTable;
+	} uboLookup;
 
 	struct {
-		vkTools::VulkanTexture triTable;
-	} textures;
+		vkTools::UniformData compute;
+		vkTools::UniformData lookup;
+	} uniformData;
 
 	struct {
 		vkTools::UniformData vertex_buffer;
@@ -29,7 +31,6 @@ public:
 	} storageBuffers;
 
 	struct {
-		VkPipeline render;
 		VkPipeline compute;
 	} pipelines;
 
@@ -45,7 +46,6 @@ public:
 	~VulkanTerrain();
 
 	void loadMesh();
-	void loadTextures();
 	void buildComputeCommandBuffer();
 	void draw();
 	void prepareStorageBuffers();

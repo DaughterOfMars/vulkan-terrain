@@ -12,7 +12,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow) {
-	app = new VulkanTerrain(false);
+	app = new VulkanTerrain(true);
 	app->meshRenderer->winHandle = app->setupWindow(hInstance, WndProc);
 	app->initSwapChain();
 	app->prepare();

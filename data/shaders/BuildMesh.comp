@@ -1,10 +1,16 @@
 #version 450
 
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 32) in;
-layout(binding = 0) uniform isampler2D triTable;
 
 layout(std140, binding = 0) uniform UBO{
 	ivec3 ChunkPosition;
+};
+
+layout(std140, binding = 1) uniform LOOKUP{
+	int triTable[256][16];
 };
 
 struct Vertex {
@@ -12,12 +18,12 @@ struct Vertex {
 	vec4 normal;
 };
 
-layout (std430, binding = 0) buffer vertex_buffer{
-	Vertex vertex[];
+layout (std430, binding = 2) buffer vertex_buffer{
+	Vertex vertex[ ];
 } vbuf;
 
-layout (std430, binding = 1) buffer index_buffer{
-	uint index[];
+layout (std430, binding = 3) buffer index_buffer{
+	uint index[ ];
 } ibuf;
 
 shared uint vertex_buffer_index;
@@ -267,7 +273,7 @@ void generateIndices(ivec3 pos, uint caseID){
 		triangleCount = 0;
 	for(uint t = 0; t < triangleCount; t++){
 		uint tableOffset = t*3;
-		ivec3 vertexEdges = ivec3(texelFetch(triTable, ivec2(tableOffset, caseID), 0).r, texelFetch(triTable, ivec2(tableOffset+1, caseID), 0).r, texelFetch(triTable, ivec2(tableOffset+2, caseID), 0).r);
+		ivec3 vertexEdges = ivec3(triTable[tableOffset][caseID], triTable[tableOffset+1][caseID], triTable[tableOffset+2][caseID]);
 		uvec3 indices;
 		for(int i = 2; i >= 0; --i){
 			ivec3 voxel = pos + shift2[vertexEdges[i]];
@@ -324,7 +330,7 @@ void main(){
 	vertex_buffer_index = 0;
 	index_buffer_index = 0;
 	barrier();
-	ivec3 pos = ivec3(gl_GlobalInvocationID);
+	ivec3 pos = ivec3(gl_WorkGroupID);
 	float d = density(pos);
 	DensityMap[pos.x][pos.y][pos.z] = d;
 	barrier(); // Ensure that density values are complete
