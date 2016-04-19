@@ -263,17 +263,17 @@ void VulkanTerrain::setupDescriptorSet() {
 		vkTools::initializers::writeDescriptorSet(
 			computeDescriptorSet,
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			0,
+			1,
 			&uniformData.lookup.descriptor),
 		vkTools::initializers::writeDescriptorSet(
 			computeDescriptorSet,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			1,
+			2,
 			&storageBuffers.vertex_buffer.descriptor),
 		vkTools::initializers::writeDescriptorSet(
 			computeDescriptorSet,
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			2,
+			3,
 			&storageBuffers.index_buffer.descriptor)
 	};
 
