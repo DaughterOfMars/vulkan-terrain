@@ -310,7 +310,7 @@ void VulkanTerrain::prepareUniformBuffers() {
 
 	uboLookup.triTable = &triTable;
 
-#define LOOKUP_SIZE 256*16*sizeof(int32_t)
+#define LOOKUP_SIZE 256*16*sizeof(int)
 
 	createBuffer(
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
