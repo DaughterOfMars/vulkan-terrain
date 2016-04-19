@@ -9,20 +9,18 @@ layout(std140, binding = 0) uniform UBO{
 	ivec3 ChunkPosition;
 };
 
-layout(std140, binding = 1) uniform LOOKUP{
-	int triTable[256][16];
-};
+layout (binding = 3) uniform isampler2D triTable;
 
 struct Vertex {
 	vec4 worldPosition;
 	vec4 normal;
 };
 
-layout (std430, binding = 2) buffer vertex_buffer{
+layout (std430, binding = 1) buffer vertex_buffer{
 	Vertex vertex[ ];
 } vbuf;
 
-layout (std430, binding = 3) buffer index_buffer{
+layout (std430, binding = 2) buffer index_buffer{
 	uint index[ ];
 } ibuf;
 
@@ -273,7 +271,7 @@ void generateIndices(ivec3 pos, uint caseID){
 		triangleCount = 0;
 	for(uint t = 0; t < triangleCount; t++){
 		uint tableOffset = t*3;
-		ivec3 vertexEdges = ivec3(triTable[tableOffset][caseID], triTable[tableOffset+1][caseID], triTable[tableOffset+2][caseID]);
+		ivec3 vertexEdges = ivec3(texelFetch(triTable, ivec2(tableOffset, caseID), 0).r, texelFetch(triTable, ivec2(tableOffset+1, caseID), 0).r, texelFetch(triTable, ivec2(tableOffset+2, caseID), 0).r);
 		uvec3 indices;
 		for(int i = 2; i >= 0; --i){
 			ivec3 voxel = pos + shift2[vertexEdges[i]];

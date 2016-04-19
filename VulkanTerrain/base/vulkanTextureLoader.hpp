@@ -61,7 +61,7 @@ namespace vkTools
 		// Load a 2D texture
 		void loadTexture(const char* filename, VkFormat format, VulkanTexture *texture, bool forceLinear)
 		{
-			loadTexture(filename, format, texture, false, VK_IMAGE_USAGE_SAMPLED_BIT);
+			loadTexture(filename, format, texture, forceLinear, VK_IMAGE_USAGE_SAMPLED_BIT);
 		}
 
 		// Load a 2D texture
@@ -398,7 +398,7 @@ namespace vkTools
 			cmdBufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 			cmdBufInfo.commandBufferCount = 1;
 
-			vkTools:checkResult(vkAllocateCommandBuffers(device, &cmdBufInfo, &cmdBuffer));
+			vkTools::checkResult(vkAllocateCommandBuffers(device, &cmdBufInfo, &cmdBuffer));
 		}
 
 		~VulkanTextureLoader()
